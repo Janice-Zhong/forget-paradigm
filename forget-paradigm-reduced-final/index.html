@@ -1,0 +1,1499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>my experiment</title>
+    <script src='https://www.naodao.com/public/experiment/libs/jspsych-7/jspsych.js'></script>
+    <script src="https://www.naodao.com/public/experiment/libs/plugin/plugin-html-keyboard-response.js"></script>
+    <script src="https://www.naodao.com/public/experiment/libs/plugin/plugin-html-button-response.js"></script>
+    <script src="https://www.naodao.com/public/experiment/libs/plugin/plugin-instructions.js"></script>
+    <script src="https://www.naodao.com/public/experiment/libs/plugin/plugin-image-keyboard-response.js"></script>
+    <script src="https://www.naodao.com/public/experiment/libs/plugin/plugin-fullscreen.js"></script>
+    <script src="https://www.naodao.com/public/experiment/libs/plugin/plugin-preload.js"></script>
+    <script src="https://www.naodao.com/public/experiment/libs/plugin/plugin-survey-multi-choice.js"></script>
+    <script src="https://www.naodao.com/public/experiment/libs/plugin/plugin-survey-text.js"></script>
+    <script src="https://www.naodao.com/public/experiment/libs/plugin/plugin-survey-html-form.js"></script>
+    <link rel='stylesheet' href='https://www.naodao.com/public/experiment/libs/jspsych-7/css/jspsych.css'>
+    <script src='https://www.naodao.com/public/experiment/libs/extension/naodao-2021-12.js'></script>
+    <script src='https://www.naodao.com/public/experiment/libs/axios.min.js'></script>
+    <link rel="stylesheet" href="dist/jspsych.css" type="text/css"/>
+    
+    <style type="text/css"> 
+
+        .parent {
+            position: relative;
+            width: 850px;
+            height: 600px;
+            font-size: 29px;
+        }
+
+        .tut_stim{
+            position: relative;
+            top: 2%;
+            height: 450px; 
+            margin-left: -4%;
+        }
+
+        /* --------- Main trial ----------- */
+
+        .response {
+            position: absolute; 
+            margin-left: -200px; 
+            margin-top:  -100px;
+        }
+
+        .stim{
+            position: relative;
+            background-color: black;
+            top: 10%;
+            height: 190px; 
+            padding: 30px;
+            z-index: 1;
+        }
+
+        .bins{
+            position: relative;
+            background-color: white;
+            top: 10%;
+            height: 250px; 
+        }
+
+        .fedbox{
+            position: absolute;
+            height: 350px;
+            width: 330px;
+            border-width: 6px;
+            /* border-color:green; */
+            border-top-style:solid;
+            border-right-style:solid;
+            border-bottom-style:solid;
+            border-left-style:solid;
+            z-index: 10;
+        }
+
+        .text{
+            position: relative;
+            top: 10%;
+            font-size: 38px;
+            line-height: 210%;
+        }
+
+        .large-input {
+            width: 300px; /* Set the width as desired */
+            height: 40px; /* Set the height as desired */
+            font-size: 16px; /* Set the font size as desired */
+            /* Add any other custom styles you want for the input box */
+        }
+
+    </style>   
+</head>
+<body></body>
+<script>
+
+
+/* ------- 待解决问题 ------- */
+
+// 1. 随机么？
+
+/* ------ Axuilliary ----- */
+
+const randint = function(s_idx, e_idx){
+    /* Generate a random int */
+	var z = Math.floor(s_idx + Math.random()*(e_idx-s_idx));
+    return z
+};
+
+const random_choices = function(p, count, replace=false) {
+    /* random choice like np.random.choice */
+    if (replace==true){
+        return Array.from(Array(count), rand_choice.bind(null, p));
+    }else if (replace==false){
+        let p_shuffle = shuffle(p);
+        return p_shuffle.slice(0, count)
+    };
+};
+
+const rand_choice = function(p){
+    let rnd = p.reduce( (a, b) => a + b ) * Math.random();
+    return p.findIndex( a => (rnd -= a) < 0 );
+};
+
+const range = function(start, stop, step = 1){
+    /* Generate a number sequence */
+    return Array(Math.ceil((stop - start) / step)
+            ).fill(start).map((x, y) => x + y * step);
+};
+
+const shuffle = function(array){
+    /* Shuffle and return an array */
+    let currentIndex = array.length, randomIndex;
+    let array2 = Array.from(array)
+    // While there remain elements to shuffle.
+    while (currentIndex != 0) {
+        // Pick a remaining element.
+        randomIndex = Math.floor(Math.random() * currentIndex);
+        currentIndex--;
+        // And swap it with the current element.
+        [array2[currentIndex], array2[randomIndex]] = [
+        array2[randomIndex], array2[currentIndex]];
+    }
+    return array2;
+};
+
+const dot = function(a, b){
+    /* Dot product */
+    let result = 0;
+    for (let i = 0; i < a.length; i++) {
+        result += a[i] * b[i];
+    }
+    return result;
+};
+
+const arr_add = function(arr1, arr2){
+    /* Add two array elementwise*/
+    let r = arr1.map((element, index) => element + arr2[index]);
+    return r 
+};
+
+const count_element = function(arr){
+    let count = arr.reduce((counter, element) => {
+        counter[element] = (counter[element] || 0) + 1;
+        return counter;
+        }, {});
+    return count 
+};
+    
+const key2num = function(k){
+    var k_map = {
+        'arrowup':    0, 
+        'arrowdown':  1,
+        'arrowleft':  2, 
+        'arrowright': 3,
+    };
+    return k_map[k]
+};
+
+/* ------  Step0: Set up configuration ------- */ 
+
+const init_block_config = function(block_typ, block_id){
+    /* Init the configuration
+
+    Get the configuration for the experiment
+    Variables of interest:
+        s: stimulus
+        a_ava: the available action
+        a_cor: correct answer. 
+        a_real: real answer. The real stochastic answer
+            that return the reward
+        trial: the number of trial 
+        phase: the different experiment phase within a block
+            - init 1
+            - init 2
+            - gen
+        stage: whether the feedback is given at this trial
+            - train: feedback is given
+            - test: feedback is not given
+        tps: trial per stimulus. The number of times the very
+            stimulus presented. 
+        block_id: the id of the block
+        block_type: the type of the block:
+            - 'cont': the control block, means experiment 1
+            - 'exp': the experimental blcok 
+    */
+
+    var s     = [];
+    var phase = [];
+    var tps   = [];
+    var a_ava = [];
+    var n_learn_rep = block_info[block_typ]['n_learn_rep']
+    var n_gen_rep   = block_info[block_typ]['n_gen_rep']
+
+    // for the control experiment 
+    if (block_typ=='prac1'){
+        // the init learning phase
+        stims = range(0, 2)
+        for (var t=0; t<n_learn_rep; t++){
+            s = s.concat(shuffle(stims));
+            phase = phase.concat(Array(stims.length).fill('learn1'));
+            tps = tps.concat(Array(stims.length).fill(t))       
+            a_ava = a_ava.concat(Array(stims.length).fill('[2, 3]'))
+
+        }
+        // the correct act to a 
+        function get_a_cor(s){
+            if ([0].includes(s)){
+                return 2
+            }else if ([1].includes(s)){
+                return 3
+            }else {
+                return 99
+            }
+        }
+        var a_cor = s.map(x => get_a_cor(x))
+        // get the real action, mask
+        // 90% of the correct rate 
+        function get_mask(stim){
+            var mask = Array(20).fill(0);
+            for (var i=0; i<2; i++){
+                var m = random_choices(range(0, n_learn_rep), 1)
+                for (var j=0; j<m.length; j++){
+                    var s_id = m[j]*2
+                    var e_id = (m[j]+1)*2
+                    idx = stim.slice(s_id, e_id).indexOf(i)+s_id
+                    mask[idx] = 99
+                }
+            };
+            return mask 
+        }
+        var mask = get_mask(s);
+        var a_real = arr_add(a_cor, mask);
+        var stage_arr = Array(s.length).fill('train');
+
+    }else if (block_typ=='prac2'){
+        // the init learning phase
+        stims = range(0, 4)
+        for (var t=0; t<n_learn_rep; t++){
+            s = s.concat(shuffle(stims));
+            phase = phase.concat(Array(stims.length).fill('learn1'));
+            tps = tps.concat(Array(stims.length).fill(t))
+            a_ava = a_ava.concat(Array(stims.length).fill('[2, 3]'))
+        }
+        // the correct act to a 
+        function get_a_cor(s){
+            if ([0, 1].includes(s)){
+                return 2
+            }else if ([2, 3].includes(s)){
+                return 3
+            }else {
+                return 99
+            }
+        }
+        var a_cor = s.map(x => get_a_cor(x))
+        // get the real action, mask
+        // 90% of the correct rate 
+        function get_mask(stim){
+            var mask = Array(40).fill(0);
+            for (var i=0; i<4; i++){
+                var m = random_choices(range(0, n_learn_rep), 1)
+                for (var j=0; j<m.length; j++){
+                    var s_id = m[j]*4
+                    var e_id = (m[j]+1)*4
+                    idx = stim.slice(s_id, e_id).indexOf(i)+s_id
+                    mask[idx] = 99
+                }
+            };
+            return mask 
+        }
+        var mask = get_mask(s)
+        if (if_stoch==true){
+            var a_real = arr_add(a_cor, mask);
+        }else{
+            var a_real = a_cor;
+        };
+        var stage_arr = Array(s.length).fill('train');
+        
+    }else if (block_typ=='block'){
+        // the init learning phase
+        stims = range(0, 4)
+        for (var t=0; t<n_learn_rep; t++){
+            s = s.concat(shuffle(stims));
+            phase = phase.concat(Array(stims.length).fill('learn1'));
+            tps = tps.concat(Array(stims.length).fill(t))
+            a_ava = a_ava.concat(Array(stims.length).fill('[2, 3]'))
+        }
+        // the second learning phase 
+        stims = range(4, 8)
+        for (var t=0; t<n_learn_rep; t++){
+            s = s.concat(shuffle(stims));
+            phase = phase.concat(Array(stims.length).fill('learn2'));
+            tps = tps.concat(Array(stims.length).fill(t))
+            a_ava = a_ava.concat(Array(stims.length).fill('[2, 3]'))
+        }
+        // the generalization learning phase
+        stims = range(0, 8)
+        for (var t=0; t<n_gen_rep; t++){
+            s = s.concat(shuffle(stims));
+            phase = phase.concat(Array(stims.length).fill('gen'));
+            tps = tps.concat(Array(stims.length).fill(t+n_learn_rep))
+            a_ava = a_ava.concat(Array(stims.length).fill('[2, 3]'))
+        }
+        // the correct act to a 
+        function get_a_cor(s){
+            if ([0, 1, 4, 5].includes(s)){
+                return 2
+            }else if ([2, 3, 6, 7].includes(s)){
+                return 3
+            }else if ([8].includes(s)){
+                return 2
+            }else if ([9].includes(s)){
+                return 3
+            }else {
+                return 99
+            }
+        };
+        var a_cor = s.map(x => get_a_cor(x))
+        // get the real action, mask
+        // 80% of the correct rate 
+        function get_mask(stim){
+            var mask = Array(120).fill(0);
+            // l1
+            for (var i=0; i<4; i++){
+                var m = random_choices(range(0, n_learn_rep), 1)
+                for (var j=0; j<m.length; j++){
+                    var s_id = m[j]*4
+                    var e_id = (m[j]+1)*4
+                    idx = stim.slice(s_id, e_id).indexOf(i)+s_id
+                    mask[idx] = 99
+                }
+            };
+            //l2
+            for (var i=4; i<8; i++){
+                var m = random_choices(range(0, n_learn_rep), 1)
+                for (var j=0; j<m.length; j++){
+                    var s_id = m[j]*4+4*n_learn_rep
+                    var e_id = (m[j]+1)*4+4*n_learn_rep
+                    idx = stim.slice(s_id, e_id).indexOf(i)+s_id
+                    mask[idx] = 99
+                }
+            };
+
+            return mask 
+        }
+        var mask = get_mask(s)
+        if (if_stoch==true){
+            var a_real = arr_add(a_cor, mask);
+        }else{
+            var a_real = a_cor;
+        };
+        var stage_arr = Array(4*n_learn_rep).fill('train'
+                    ).concat(Array(4*n_learn_rep).fill('train')
+                    ).concat(Array(8*n_gen_rep).fill('test'))
+                        
+
+    // for the example experiment
+    }else if (block_typ=='interleave') {
+        /*
+        // the init learning phase
+        stims = range(0, 8)
+        for (var t=0; t<n_learn_rep; t++){
+            s = s.concat(shuffle(stims));
+            phase = phase.concat(Array(stims.length).fill('learn1'));
+            tps = tps.concat(Array(stims.length).fill(t))
+            a_ava = a_ava.concat(Array(stims.length).fill('[2, 3]'))
+        }
+        // the gen learning phase
+        stims = range(0, 8)
+        for (var t=0; t<n_gen_rep; t++){
+            s = s.concat(shuffle(stims));
+            phase = phase.concat(Array(stims.length).fill('gen'));
+            tps = tps.concat(Array(stims.length).fill(t+n_learn_rep))
+            a_ava = a_ava.concat(Array(stims.length).fill('[2, 3]'))
+        }
+        */
+        var n_learn_rep_r = Math.floor(n_learn_rep / 4)
+        stims = range(0,4)
+        for (var t=0; t<n_learn_rep_r; t++){
+            s = s.concat(shuffle(stims));
+            phase = phase.concat(Array(stims.length).fill('learn1'));
+            tps = tps.concat(Array(stims.length).fill(t))
+            a_ava = a_ava.concat(Array(stims.length).fill('[2, 3]'))
+        }
+        stims = range(4, 8)
+        for (var t=0; t<n_learn_rep; t++){
+            s = s.concat(shuffle(stims));
+            phase = phase.concat(Array(stims.length).fill('learn2'));
+            tps = tps.concat(Array(stims.length).fill(t))
+            a_ava = a_ava.concat(Array(stims.length).fill('[2, 3]'))
+        }
+        stims = range(0, 8) // un
+        for (var t=0; t<n_gen_rep; t++){
+            s = s.concat(shuffle(stims));
+            phase = phase.concat(Array(stims.length).fill('gen'));
+            tps = tps.concat(Array(stims.length).fill(t+n_learn_rep))
+            a_ava = a_ava.concat(Array(stims.length).fill('[2, 3]'))
+        }
+        // the correct act to a 
+        function get_a_cor(s){
+            if ([0, 1, 4, 5].includes(s)){
+                return 2
+            }else if ([2, 3, 6, 7].includes(s)){
+                return 3
+            }else if ([8].includes(s)){
+                return 2
+            }else if ([9].includes(s)){
+                return 3
+            }else {
+                return 99
+            }
+        };
+        var a_cor = s.map(x => get_a_cor(x))
+        // get the real action, mask
+        // 80% of the correct rate 
+        function get_mask(stim){
+            var mask = Array(120).fill(0);
+            // l1
+            for (var i=0; i<4; i++){
+                var m = random_choices(range(0, (n_learn_rep_r)), 1)
+                for (var j=0; j<m.length; j++){
+                    var s_id = m[j]*4
+                    var e_id = (m[j]+1)*4
+                    idx = stim.slice(s_id, e_id).indexOf(i)+s_id
+                    mask[idx] = 99
+                }
+            };
+            for (var i = 4; i<8; i++){
+                var m = random_choices(range(0, n_learn_rep), 1)
+                for (var j=0; j<m.length; j++){
+                    var s_id = m[j]*4+4*n_learn_rep_r
+                    var e_id = (m[j]+1)*4+4*n_learn_rep_r
+                    idx = stim.slice(s_id, e_id).indexOf(i)+s_id
+                    mask[idx] = 99
+                }
+            };
+            
+            return mask 
+        }
+        var mask = get_mask(s)
+        if (if_stoch==true){
+            var a_real = arr_add(a_cor, mask);
+        }else{
+            var a_real = a_cor;
+        };
+        var stage_arr = Array(4*n_learn_rep_r).fill('train'
+                    ).concat(Array(4*n_learn_rep).fill('train')
+                    ).concat(Array(8*n_gen_rep).fill('test'))
+    }
+
+    return {
+        s: s,
+        phase: phase,
+        a_cor: a_cor,
+        a_real: a_real, 
+        trial: range(0, s.length), 
+        stage: stage_arr, 
+        tps: tps, 
+        block_id: Array(s.length).fill(block_id), 
+        block_type: Array(s.length).fill(block_typ),
+        a_ava: a_ava
+    };
+};
+
+const instan_block = function(block_typ, block_id){
+    /* Instantiate a block
+    
+    A block contains n_trial trials
+        * w_idx: weight index, [1, 2, 3, 4]
+        * trial: trial t
+        * tps: trial per stimulus
+    
+    Return block_config
+    */
+    config = init_block_config(block_typ, block_id)
+    if (['prac1', 'prac2'].includes(block_typ)){
+        n_trial = config['s'].length
+        let keys = Object.keys(config);
+        var block = [];
+        for (var t=0; t<n_trial; t++){
+            let content = {};
+            for (let i = 0; i < keys.length; i++) {
+                let k = keys[i];
+                content[k] = config[k][t];
+            };
+            block.push(content)
+        }; 
+        return {'train': block}
+    }else{
+        var n_train = config['stage'].filter(x => x=='train').length;
+        var n_test  = config['stage'].filter(x => x=='test').length
+        let keys = Object.keys(config);
+        var train_block = [];
+        for (var t=0; t<n_train; t++){
+            let content = {};
+            for (let i = 0; i < keys.length; i++) {
+                let k = keys[i];
+                content[k] = config[k][t];
+            };
+            train_block.push(content)
+        }; 
+        var test_block = [];
+        for (var t=n_train; t<n_train+n_test; t++){
+            let content = {};
+            for (let i = 0; i < keys.length; i++) {
+                let k = keys[i];
+                content[k] = config[k][t];
+            };
+            test_block.push(content)
+        }; 
+        
+        return {'train': train_block, 'test': test_block}
+    }
+   
+};
+
+const mkTimer = function(){
+    return{
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: '<div style="font-size: 25px"><p>距下一个实验开始还有</p>'
+                + '<div style="font-size: 50px; color: blue"><p><span id="clock">1:00</span></div></p>'
+                + '<p>按\"空格\"跳过休息</p></div>',
+        choices: [" "],
+        trial_duration: 60000,
+        on_load: function(){
+
+        var wait_time = 1 * 60 * 1000; // in milliseconds
+        var start_time = performance.now();
+        // add a keyboard listener 
+        document.addEventListener('keydown', function(e){
+            if (e.key == " "){
+                window.clear_timer = -1;
+            }
+        });
+        window.clear_timer = 1;
+        // document.querySelector('button').disabled = true;
+        var interval = setInterval(function(){
+            var time_left = wait_time - (performance.now() - start_time);
+            var minutes = Math.floor(time_left / 1000 / 60);
+            var seconds = Math.floor((time_left - minutes*1000*60)/1000);
+            var seconds_str = seconds.toString().padStart(2,'0');
+            if(time_left <= 0){
+                document.querySelector('#clock').innerHTML = "0:00";
+                window.clear_timer = -1;
+            };
+            if(window.clear_timer > 0){
+                document.querySelector('#clock').innerHTML = minutes + ':' + seconds_str
+            }else {
+                clearInterval(interval);
+            };
+        }, 250)
+        },
+        on_finish: function(){
+            // remove the keyboard listener 
+            document.removeEventListener('keydown', function(e){
+                if (e.key == " "){
+                    window.clear_timer = -1;
+                }
+            });
+        }
+    }
+};
+
+/* ------  Step1: Welcome and Tutorial  ------- */ 
+
+const mk_preload = function(x){
+    return {
+        type: jsPsychPreload,
+        images: x, 
+        message: "加载中...",
+        error_message: `<span style="font-size: 30px">实验加载失败，请联系工作人员。</span>`
+    }
+};
+
+const mk_wel_screen = function(){
+    return {
+        on_start: function(){
+        var now = new Date();
+        var start_time = now.toLocaleTimeString();
+        jsPsych.data.addProperties({start_time: start_time})
+        },
+        type: jsPsychFullscreen,
+        message: "<div style='font-size: 35px'>" 
+                + "<p>欢迎来到本次实验。</p>" 
+                + "<p>请点击以下按钮来进入全屏模式。</p></div>",
+        button_label: '点击进入全屏',
+        fullscreen_mode: true
+    }
+};
+
+const basic_sc = {
+  type: jsPsychSurveyHtmlForm,
+  preamble: `<p style="font-size: 40px"><b>请填写以下信息</b></p >
+             <p><br></p>`,
+  html: `<div style="font-size: 30px">
+          <p> 你的编号 &ensp; <input name="sub_id" type="text" style="width:10em; height:2em; font-size: 29px" required/><br/>
+          <p> 你的姓名 &ensp; <input name="name"   type="text" style="width:10em; height:2em; font-size: 29px" required/></p>
+          <p> 你的生日 &ensp; <input name="birth"  type="date" style="width:10em; height:2em; font-size: 29px" value="2000-01-01" required/></p >
+        </div>`,
+  button_label: '继续',
+  data: {screen_id: 'basic_info'}
+};
+
+const mk_tut = function(){
+    return {
+        timeline: [mk_tut_screen(), mk_question(), mk_ques_fed()],
+        loop_function: function(){
+            
+            var ans1 = `<span style='font-size: 24px'>将杂物放入正确的仓库中</span>`;
+            var ans2 = `<span style='font-size: 24px'> ←, → </span>`;
+            var n = jsPsych.data.get().filter({'screen_id': 'question'})['trials'].length;
+            var t1 = jsPsych.data.get().filter({'screen_id': 'question'}
+                        )['trials'][n-1]['response']['task1'] == ans1;
+            var t2 = jsPsych.data.get().filter({'screen_id': 'question'}
+                        )['trials'][n-1]['response']['task2'] == ans2;
+            if (t1*t2==1){
+                return false; 
+            }else {
+                return true;
+            }
+        }
+    }
+}
+
+const mk_tut_screen = function(){
+    return{
+        type: jsPsychInstructions,
+        pages: [
+            `<div class='parent'>
+                <p> 本次游戏中，您需要探索规则，将杂物放入正确的仓库中。</p>
+                <p> <br> </p>
+                <img class='tut_stim', src="materials/tut/tut1.png">
+                </div>`,
+            `<div class='parent'>
+                <p> 使用键盘左键<span style="color: blue"><b> ← </b></span>或者右键<span style="color: blue"><b> → </b></span>选择仓库。</p>
+                <p> 您需要在 15 秒内做出选择，否则视为错误。 </p>
+                <img class='tut_stim', src="materials/tut/tut2.png">
+                </div>`,
+            `<div class='parent'>
+                <p> 我们会在训练阶段,告诉您选择的对错。</p>
+                <p> <b>请反复尝试，找到其中的规律。</b> </p>
+                <img class='tut_stim', src="materials/tut/tut3.png">
+            </div>`,
+        ],
+        data:{
+            stimulus: "",
+            screen_id: 'instruct'
+        },
+        button_label_previous: "上一页",
+        button_label_next: "下一页",
+        show_clickable_nav: true,
+    }
+};
+
+const preload_tut = function(){
+    x = [
+        'materials/tut/tut1.png',
+        'materials/tut/tut2.png',
+        'materials/tut/tut3.png',
+        'materials/tut/tut4.png',
+    ];
+    return mk_preload(x)
+}
+
+const mk_question = function(){
+    return {
+        type: jsPsychSurveyMultiChoice,
+        questions:[
+            {
+                prompt: `<div style='font-size:30px'>如果您明白以上内容，请回答以下问题</div><br>`,
+                options: [],
+            },
+            {
+                prompt: `<span style='font-size: 28px'>您的任务是？</span>`,
+                name: 'task1',
+                data: {'screen_id': 'sub_response'},
+                options: [`<span style='font-size: 24px'>将杂物放入正确的仓库中</span>`,
+                          `<span style='font-size: 24px'>驾驶飞船离开地球</span>`, 
+                          `<span style='font-size: 24px'>选择正确按钮获得更多能量</span>`],
+                required: true,
+            },
+            {
+                prompt: `<span style='font-size:28px'>您需要键盘上的哪些按键？</span>`,
+                name: 'task2',
+                data: {'screen_id': 'sub_response'},
+                options: [`<span style='font-size: 24px'> 1, 2 </span>`,
+                          `<span style='font-size: 24px'> ←, → </span>`, 
+                          `<span style='font-size: 24px'> f, j </span>`],
+                required: true,
+            },
+        ],
+        data:{
+            stimulus: "",
+            screen_id: 'question'
+        },
+        button_label: '提交并继续',
+    }
+};
+
+const mk_ques_fed = function(){
+    return {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: function(){
+            var ans1 = `<span style='font-size: 24px'>将杂物放入正确的仓库中</span>`;
+            var ans2 = `<span style='font-size: 24px'> ←, → </span>`;
+            var n = jsPsych.data.get().filter({'screen_id': 'question'})['trials'].length;
+            var t1 = jsPsych.data.get().filter({'screen_id': 'question'}
+                        )['trials'][n-1]['response']['task1'] == ans1;
+            var t2 = jsPsych.data.get().filter({'screen_id': 'question'}
+                        )['trials'][n-1]['response']['task2'] == ans2;
+            if (t1*t2==1){
+                stim =  `
+                    <div class='parent'>
+                        <p>回答正确！我们先开始练习。</p>
+                        <p>您需要达到<span style='color: blue'> <b>${prac_acc_bar}%</b> </span>的正确率来通过练习。</p>
+                        <p> <br> </p>
+                        <p>请按"空格"键继续。</p>
+                    </div>        
+                    `
+            }else{
+                stim = `
+                <div class='parent'>
+                    <p> 抱歉，您回答错误! </p>
+                    <p> 请重新了解实验内容，或者举手呼叫工作人员。</p>
+                    <p> 按"空格"重新学习实验内容。</p>
+                </div>       
+                `
+                }
+            return stim 
+        },
+        choices: [" "],
+        trial_duration: null,
+        data: {
+            screen_id: "inst_q",
+            stimulus:  "inst", 
+            stage:     "1",
+        }
+    }
+};
+
+/* ------  Step2: Make blocks  ------- */ 
+
+const preload_block = function(block_typ, block_id){
+    n_img = {
+        'prac1': 2,
+        'prac2': 4,
+        'block': 8,
+        'interleave': 8,
+    }
+    var img = range(0, n_img[block_typ]).map(
+        x=> `materials/block${Math.abs(block_id-eps)}/${x}.png`)
+    return mk_preload(img)
+}
+
+const mk_block_instruct = function(block_typ, block_id){
+    return {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: function(){
+            if (block_id==0){
+                if (block_typ=='prac1'){
+                    stim = `
+                    <div class='parent'>
+                        <p>我们先进行两次练习。</p>
+                        <p> <br> </p>
+                        <p>请按"空格"键开始练习。</p>
+                    </div>        
+                    `
+                }else{
+                    stim = `
+                    <div class='parent'>
+                        <p> 恭喜您顺利从练习中毕业, 现在我们开始正式游戏! </p>
+                        <p> 请记住，您的任务是<span style="color: blue">对杂物进行准确分类！</span> </p>
+                        <p> <br> </p>
+                        <p> 请按"空格"键开始游戏。</p>
+                    </div>   
+                    `
+                }
+            }else if(block_id==1){
+                if (block_typ=='prac2'){
+                    stim = `
+                    <div class='parent'>
+                        <p>我们先开始练习。</p>
+                        <p>您需要达到<span style='color: blue'> <b>${prac_acc_bar}%</b> </span>的正确率来通过练习。</p>
+                        <p> <br> </p>
+                        <p>请按"空格"键继续。</p>
+                    </div>        
+                    `
+                }else{
+                    stim = `
+                    <div class='parent'>
+                        <p> 好，现在我们开始第二局游戏。</p>
+                        <p> 现在分类规则改变了，请重新探索正确答案。</p>
+                        <p> <br> </p>
+                        <p> 如果您已经准备好，请按"空格"键开始游戏。</p>
+                    </div>   
+                    `
+                }
+            }else{
+                stim = 'error'
+            }
+            return stim 
+            },
+        choices: [" "],
+        trial_duration: null,
+        data: {
+            screen_id: "inst",
+            stimulus:  "inst", 
+            stage:     "1",
+        }
+    }
+};
+
+const mk_gen_instruct = function(block_typ, block_id){
+    return {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: function(){
+            return `<div style='font-size: 32px; text-align: center;'
+                    <p>非常好！接下来会测试您刚才学到的杂物分类。</p>
+                    <p>我们将<span style='color: blue'><b> 不告诉 </b></span>您选择的对错。</p>
+                    <p>请按\"空格\"继续实验。</p></div>`;
+        },
+        choices: [" "],
+    }
+};
+
+const mk_block_feedback = function(block_typ, block_id){
+    return {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: function(){
+            var n_cor   = jsPsych.data.getLastTimelineData().filter(
+                        {r: 1}).values().length;
+            var n_incor = jsPsych.data.getLastTimelineData().filter(
+                        {r: 0}).values().length;
+            //console.log(jsPsych.data.getLastTimelineData())
+            var rate = Math.floor(n_cor*100/(n_incor+n_cor))
+            if (block_id==0){
+                if (block_typ=='prac1'){
+                    stim = `
+                    <div class='parent'>
+                        <p> 恭喜你完成练习</p>
+                        <p> 您的正确率是：</p>
+                        <p><span style="color:blue; font-size: 30px">
+                                ${rate}%
+                            </span></p>
+                        <p> <br> </p>
+                        <p>按"空格"继续</p>
+                    </div>        
+                    `
+                }else{
+                    stim = `
+                    <div class='parent'>
+                        <p> 恭喜完成第一次游戏! </p>
+                        <p> 您的正确率是：</p>
+                        <p><span style="color: blue; font-size: 30px">
+                                ${rate}%
+                        </span></p>
+                        <p> <br> </p>
+                        <p>按"空格"继续</p>
+                    </div>       
+                    `
+                }
+            }else if(block_id==1){
+                if (block_typ=='prac2'){
+                    if (rate >= prac_acc_bar){
+                        stim = `
+                        <div class='parent'>
+                            <p> 您的正确率是 </p>
+                            <p><span style="color: blue; font-size: 30px">
+                                    <b>${rate}%</b>
+                                </span></p>
+                            <p> 恭喜通过练习！ </p>
+                            <p>按"空格"继续</p>
+                        </div>         
+                    `
+                    }else {
+                        stim = `
+                        <div class='parent'>
+                            <p> 您的正确率是：</p>
+                            <p><span style="color: blue; font-size: 30px">
+                                    <b>${rate}%</b>
+                                </span></p>
+                            <p>抱歉！正确率未达到${prac_acc_bar}%。</p>
+                            <p>您没通过练习，请按\"空格\"重新开始</p>
+                        </div>         
+                    `
+                    }
+                }else{
+                    stim = `
+                    <div class='parent'>
+                        <p>恭喜完成第二次游戏</p>
+                        <p> 您的正确率是 </p>
+                        <p><span style="color:blue; font-size: 30px">
+                                ${rate}%
+                        </span></p>
+                        <p> <br> </p>
+                        <p>按"空格"继续</p>
+                    </div>       
+                    `
+                }
+            }else{
+                stim = 'error'
+            }
+            return stim 
+            },
+        choices: [" "],
+        trial_duration: 5000,
+        data: {
+            screen_id: "inst",
+            stimulus:  "inst", 
+            stage:     "1",
+        }
+    }
+};
+
+const mk_fixation = function(){
+    /* Make a fixation screen
+        
+    Args: 
+        t: the maximum screen time 
+    
+    Returns:
+        a fixation screen object
+    */
+    return {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: function(){
+            var b = jsPsych.timelineVariable('block_type');
+            var b_id = jsPsych.timelineVariable('block_id');
+            var s = jsPsych.timelineVariable('s');
+            var a_ava = jsPsych.timelineVariable('a_ava');
+            //console.log(a_ava)
+            if (a_ava=='[0, 1, 2, 3]'){
+                var stim_str = `<div class="response" style="top: 16%; left: 54.6%; font-size: 35px">请对杂物进行分类</div>`;
+                var hpos = [57, 57, 40, 74]; 
+                var vpos = [27, 88, 57, 57];
+                var directs = ['up', 'down', 'left', 'right'] 
+                for (var i=0; i<directs.length; i++){
+                    stim_str += `<div class="response" style="left: ${hpos[i]}%; top: ${vpos[i]}%">
+                        <img class='bins' src="materials/${directs[i]}_bin.png"></div>`
+                }
+                if (['prac1', 'prac2'].includes(b)){
+                    var fold = b
+                } else{
+                    var fold = `block${Math.abs(b_id-eps)}`
+                }
+                stim_str += "<div style='font-size: 40px; position: absolute; top: 51%; left:47%'><b>准备...</b></div>";
+
+            }else if(a_ava=='[0, 1]'){
+                var stim_str = `<div class="response" style="top: 16%; left: 51%; font-size: 40px">
+                                    <p>请对垃圾进行分类</p>
+                                    <p><span style="color:blue">\"←\"</span> 或者 <span style="color:blue">\"→\"</span></p>
+                                </div>`;
+                var hpos = [57, 57]; 
+                var vpos = [27, 88];
+                var directs = ['up', 'down'] 
+                for (var i=0; i<directs.length; i++){
+                    stim_str += `<div class="response" style="left: ${hpos[i]}%; top: ${vpos[i]}%">
+                        <img class='bins' src="materials/${directs[i]}_bin.png"></div>`
+                }
+                if (['prac1', 'prac2'].includes(b)){
+                    var fold = b
+                } else{
+                    var fold = `block${Math.abs(b_id-eps)}`
+                }
+                stim_str += "<div style='font-size: 40px; position: absolute; top: 51%; left:48%'><b>准备...</b></div>";
+
+            }else if(a_ava=='[2, 3]'){
+                var stim_str = `<div class="response" style="top: 16%; left: 51%; font-size: 40px">
+                                    <p>请将杂物放入正确仓库</p>
+                                </div>`;
+                /*
+                var hpos = [32, 78]; 
+                var vpos = [55, 55];
+                var directs = ['left', 'right'] 
+                stim_str += `
+                        <div class="response" style="left: 34%; top: 48%;
+                        color: black; font-size: 40px"><b> 左仓库← </b></div>
+                        <div class="response" style="left: 80%; top: 48%;
+                        color: black; font-size: 40px"><b> 右仓库→ </b></div>
+                    `
+                for (var i=0; i<directs.length; i++){
+                    stim_str += `<div class="response" style="left: ${hpos[i]}%; top: ${vpos[i]}%">
+                        <img class='bins' src="materials/rooms/${directs[i]}_room.png"></div>`
+                }
+                */
+                if (['prac1', 'prac2'].includes(b)){
+                    var fold = b
+                } else{
+                    var fold = `block${Math.abs(b_id-eps)}`
+                }
+                stim_str += "<div style='font-size: 40px; position: absolute; top: 51%; left:47.5%'><b>准备...</b></div>";
+
+            };
+            return stim_str
+        },
+        choices: "NO_KYES",
+        trial_duration: 500,
+        data: {
+            screen_id: "fixation",
+            stimulus:  "fixation", 
+        }
+    }
+};
+/*
+const mk_blank_screen = function(){
+    return {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: '',
+        choices: jsPsych.NO_KEYS,
+        trial_duration: 500,
+    };
+};
+*/
+const mk_response = function(){
+    /* Make respose screen */
+    return {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: function(){
+            var b = jsPsych.timelineVariable('block_type');
+            var b_id = jsPsych.timelineVariable('block_id');
+            var s = jsPsych.timelineVariable('s');
+            var a_ava = jsPsych.timelineVariable('a_ava');
+            //console.log(a_ava)
+            if (a_ava=='[0, 1, 2, 3]'){
+                var stim_str = `<div class="response" style="top: 16%; left: 54.6%; font-size: 35px">请对杂物进行分类</div>`;
+                var hpos = [57, 57, 40, 74]; 
+                var vpos = [27, 88, 57, 57];
+                var directs = ['up', 'down', 'left', 'right'] 
+                for (var i=0; i<directs.length; i++){
+                    stim_str += `<div class="response" style="left: ${hpos[i]}%; top: ${vpos[i]}%">
+                        <img class='bins' src="materials/${directs[i]}_bin.png"></div>`
+                }
+                if (['prac1', 'prac2'].includes(b)){
+                    var fold = b
+                } else{
+                    var fold = `block${Math.abs(b_id-eps)}`
+                }
+                stim_str += `<div class="response" style="left: 55.5%; top: 54%">
+                        <img class='stim' src="materials/${fold}/${s}.png"></div>`
+            }else if(a_ava=='[0, 1]'){
+                var stim_str = `<div class="response" style="top: 16%; left: 51%; font-size: 40px">
+                                    <p>请对垃圾进行分类</p>
+                                    <p><span style="color:blue">\"←\"</span> 或者 <span style="color:blue">\"→\"</span></p>
+                                </div>`;
+                var hpos = [57, 57]; 
+                var vpos = [27, 88];
+                var directs = ['up', 'down'] 
+                for (var i=0; i<directs.length; i++){
+                    stim_str += `<div class="response" style="left: ${hpos[i]}%; top: ${vpos[i]}%">
+                        <img class='bins' src="materials/${directs[i]}_bin.png"></div>`
+                }
+                if (['prac1', 'prac2'].includes(b)){
+                    var fold = b
+                } else{
+                    var fold = `block${Math.abs(b_id-eps)}`
+                }
+                stim_str += `<div class="response" style="left: 55.5%; top: 54%">
+                        <img class='stim' src="materials/${fold}/${s}.png"></div>`
+            }else if(a_ava=='[2, 3]'){
+                var stim_str = `<div class="response" style="top: 16%; left: 51%; font-size: 40px">
+                                    <p>请将杂物放入正确仓库</p>
+                                </div>`;
+                var hpos = [37, 82]; 
+                var vpos = [60, 60];
+                var directs = ['left', 'right'] 
+                stim_str += `
+                        <div class="response" style="left: 35%; top: 50%;
+                        color: black; font-size: 40px"><b> 左仓库← </b></div>
+                        <div class="response" style="left: 80%; top: 50%;
+                        color: black; font-size: 40px"><b> 右仓库→ </b></div>
+                    `
+                /*
+                    for (var i=0; i<directs.length; i++){
+                    stim_str += `<div class="response" style="left: ${hpos[i]}%; top: ${vpos[i]}%">
+                        <img class='bins' src="materials/rooms/${directs[i]}_room.png"></div>`
+                }
+                */
+                if (['prac1', 'prac2'].includes(b)){
+                    var fold = b
+                } else{
+                    var fold = `block${Math.abs(b_id-eps)}`
+                }
+                stim_str += `<div class="response" style="left: 55%; top: 54%">
+                        <img class='stim' src="materials/${fold}/${s}.png"></div>`
+            };
+            return stim_str
+        },
+        on_load: function(){
+            var a_ava = jsPsych.timelineVariable('a_ava');
+            if (a_ava=='[2, 3]'){
+                setTimeout(() => {
+                    var hpos = [37, 82];
+                    var vpos = [60, 60];
+                    var directs = ['left', 'right'];
+                    for (var i = 0; i < directs.length; i++) {
+                        var additional_stimulus = `<div class="response" style="left: ${hpos[i]}%; top: ${vpos[i]}%">
+                            <img class='bins' src="materials/rooms/${directs[i]}_room.png" style = "width:100px; height:67px;"></div>`;
+                        document.querySelector('.jspsych-content').insertAdjacentHTML('beforeend', additional_stimulus);
+                    }
+                }, 500);
+            }
+        },
+        choices: function(){
+            var a_ava = jsPsych.timelineVariable('a_ava');
+            if (a_ava=='[0, 1]'){
+                k_ava = ['ArrowUp', 'ArrowDown']
+            }else if (a_ava=='[2, 3]'){
+                k_ava = ['ArrowLeft', 'ArrowRight']
+            }else {
+                k_ava = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']
+            }
+            return k_ava
+        },
+        trial_duration: t_res,
+        data: {
+            screen_id: "price",
+            stimulus:  "price", 
+            stage:     "1",
+        },
+        on_finish: function(data){
+            // get the response of the participant
+            // as a global variable
+            window.a = key2num(data['response']);
+            window.rt = data['rt']
+        }
+    }
+};
+
+const mk_feedback = function(){
+    return {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: function(){
+            var b = jsPsych.timelineVariable('block_type');
+            var s = jsPsych.timelineVariable('s');
+            var b_id = jsPsych.timelineVariable('block_id');
+            var a_ava = jsPsych.timelineVariable('a_ava');
+            var stage = jsPsych.timelineVariable('stage');
+            var a_real = jsPsych.timelineVariable('a_real');
+            var stim_str = '';
+
+            if (a_ava == '[0, 1, 2, 3]'){
+                stim_str += `<div class="response" style="top: 16%; left: 54.6%; font-size: 35px">请对垃圾进行分类</div>`;
+                var hpos = [57, 57, 40, 74]; 
+                var vpos = [27, 88, 57, 57];
+                var directs = ['up', 'down', 'left', 'right'];
+                for (var i = 0; i < directs.length; i++){
+                    stim_str += `<div class="response" style="left: ${hpos[i]}%; top: ${vpos[i]}%">
+                        <img class='bins' src="materials/${directs[i]}_bin.png"></div>`;
+                }
+                if (['prac1', 'prac2'].includes(b)){
+                    var fold = b;
+                } else{
+                    var fold = `block${Math.abs(b_id - eps)}`;
+                }
+                stim_str += `<div class="response" style="left: 55%; top: 53.5%">
+                        <img class='stim' src="materials/${fold}/${s}.png"></div>`;
+            } else if (a_ava == '[0, 1]'){
+                stim_str += `<div class="response" style="top: 16%; left: 54%; font-size: 35px">请对垃圾进行分类</div>`;
+                var hpos = [57 - 0.5, 57 - 0.5]; 
+                var vpos = [27 - 0.5, 88 - 0.5];
+                var directs = ['up', 'down'];
+                for (var i = 0; i < directs.length; i++){
+                    stim_str += `<div class="response" style="left: ${hpos[i]}%; top: ${vpos[i]}%">
+                        <img class='bins' src="materials/${directs[i]}_bin.png"></div>`;
+                }
+                if (['prac1', 'prac2'].includes(b)){
+                    var fold = b;
+                } else{
+                    var fold = `block${Math.abs(b_id - eps)}`;
+                }
+                stim_str += `<div class="response" style="left: 55.5%; top: 54%">
+                        <div class='stim_back'></div>
+                        <img class='stim' src="materials/${fold}/${s}.png"></div>`;
+            } else if (a_ava == '[2, 3]'){
+                stim_str += `<div class="response" style="top: 16%; left: 51%; font-size: 40px">
+                                    <p>请将杂物放入正确仓库</p>
+                                </div>`;
+                var hpos = [37, 82]; 
+                var vpos = [60, 60];
+                var directs = ['left', 'right'];
+                stim_str += `
+                        <div class="response" style="left: 35%; top: 50%;
+                        color: black; font-size: 40px"><b> 左仓库← </b></div>
+                        <div class="response" style="left: 80%; top: 50%;
+                        color: black; font-size: 40px"><b> 右仓库→ </b></div>`;
+                for (var i = 0; i < directs.length; i++){
+                    stim_str += `<div class="response" style="left: ${hpos[i]}%; top: ${vpos[i]}%">
+                        <img class='bins' src="materials/rooms/${directs[i]}_room.png" style="width:100px; height:67px;"></div>`;
+                }
+                if (['prac1', 'prac2'].includes(b)){
+                    var fold = b;
+                } else{
+                    var fold = `block${Math.abs(b_id - eps)}`;
+                }
+                stim_str += `<div class="response" style="left: 55%; top: 54%">
+                        <img class='stim' src="materials/${fold}/${s}.png"></div>`;
+            }
+
+            window.r = (a_real == window.a) ? 1 : 0;
+            var color = window.r ? 'green' : 'red';
+            var c_word = window.r ? '<b>正确！+1</b>' : '<b>错误！+0</b>';
+
+            var hpos = [60, 60, 37, 82];
+            var vpos = [35, 93, 60, 60];
+            if (stage == 'train'){
+                stim_str += `<div class="response feedback" style="left: ${hpos[window.a]}%; 
+                            top: ${vpos[window.a] - 5}%; z-index: 10;">
+                            <span style="color: ${color}; font-size: 30px">${c_word}</span></div>
+                            <div class="response feedback" style="left: ${hpos[window.a]}%; 
+                            top: ${vpos[window.a]}%; z-index: 10;">
+                            <div class="fedbox" style="border-color: ${color}; width: 100px; height: 67px;"></div></div>`;
+            }
+
+            return stim_str;
+        },
+        choices: [],
+        trial_duration: function(){
+            var stage = jsPsych.timelineVariable('stage');
+            if (stage == "train"){
+                return t_feed;
+            } else {
+                return 0;
+            }
+        },
+        data: {
+            screen_id: "sub_response", 
+            stage: "train",
+        },
+        on_finish: function(data){
+            for (var i = 0; i < voi.length; i++){
+                var k = voi[i];
+                data[k] = jsPsych.timelineVariable(k);
+            }
+            data['a'] = window.a;
+            data['r'] = window.r;
+            data['rt'] = window.rt;
+            var b_id = jsPsych.timelineVariable('block_id');
+            data['folder'] = `block${Math.abs(b_id - eps)}`;
+        }
+    };
+};
+
+
+const mk_prac_block = function(block_typ, block_id){
+    var block_var = instan_block(block_typ, block_id)['train'];
+    var trails = {
+        timeline: [mk_fixation(), mk_response(), mk_feedback()],
+        timeline_variables: block_var,
+    }
+    var block_time_line = [
+            preload_block(block_typ, block_id), 
+            // mk_block_instruct(block_typ, block_id), 
+            trails,
+            mk_block_feedback(block_typ, block_id)
+        ];
+    if (block_typ=='prac2'){
+        
+        return {
+            timeline: block_time_line,
+            loop_function: function(){
+                var n_cor   = jsPsych.data.getLastTimelineData().filter(
+                        {r: 1}).values().length;
+                var n_incor = jsPsych.data.getLastTimelineData().filter(
+                            {r: 0}).values().length;
+                //console.log(jsPsych.data.getLastTimelineData())
+                var rate = Math.floor(n_cor*100/(n_incor+n_cor))
+                if (rate < prac_acc_bar){
+                    window.n_Prac = window.n_Prac + 1;
+                    return true;
+                }else {
+                    jsPsych.data.addProperties({n_Prac: window.n_Prac})        
+                    return false;
+                }
+            }
+        }
+    }else{
+        return {
+            timeline: block_time_line,
+        }
+    }
+    
+};
+
+const mk_main_block = function(block_typ, block_id){
+    var block_var = instan_block(block_typ, block_id);
+    //console.log(block_var)
+    var train_var = block_var['train'];
+    var test_var  = block_var['test'];
+    // train block 
+    var train_trails = {
+        timeline: [mk_fixation(), mk_response(), mk_feedback()],
+        timeline_variables: train_var,
+    };
+    // test block 
+    var test_trails = {
+        timeline: [mk_fixation(), mk_response(), mk_feedback()],
+        timeline_variables: test_var,
+    };
+    var block_time_line = [
+            preload_block(block_typ, block_id), 
+            mk_block_instruct(block_typ, block_id), 
+            train_trails,
+            mk_gen_instruct(),
+            test_trails, 
+            mk_block_feedback(block_typ, block_id)
+        ];
+    
+        return {timeline: block_time_line}
+};
+
+const mk_timer = function(){
+    return{
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: '<div style="font-size: 27px"><p>在继续本游戏前，你可以选择休息一分钟。</p>'
+                + '<div style="font-size: 27px"><p>距下一个阶段开始还有</p>'
+                + '<div style="font-size: 50px; color: blue"><p><span id="clock">1:00</span></div></p>'
+                + '<p>按\"Q\"跳过休息</p></div>',
+        choices: ['q'],
+        trial_duration: 60000,
+        on_load: function(){
+
+        var wait_time = 1 * 60 * 1000; // in milliseconds
+        var start_time = performance.now();
+        // add a keyboard listener 
+        document.addEventListener('keydown', function(e){
+            if (e.key == 'q'){
+                window.clear_timer = -1;
+            }
+        });
+        window.clear_timer = 1;
+        // document.querySelector('button').disabled = true;
+        var interval = setInterval(function(){
+            var time_left = wait_time - (performance.now() - start_time);
+            var minutes = Math.floor(time_left / 1000 / 60);
+            var seconds = Math.floor((time_left - minutes*1000*60)/1000);
+            var seconds_str = seconds.toString().padStart(2,'0');
+            if(time_left <= 0){
+                document.querySelector('#clock').innerHTML = "0:00";
+                window.clear_timer = -1;
+            };
+            if(window.clear_timer > 0){
+                document.querySelector('#clock').innerHTML = minutes + ':' + seconds_str
+            }else {
+                clearInterval(interval);
+            };
+        }, 250)
+        },
+        on_finish: function(){
+            // remove the keyboard listener 
+            document.removeEventListener('keydown', function(e){
+                if (e.key == 'q'){
+                    window.clear_timer = -1;
+                }
+            });
+        }
+    }
+};
+
+/*-------------------------------*/
+let end = {
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: "<div style='font-size: 40px'>你已完成测试，按下空格或 5 秒后自动退出</div>",
+    trial_duration: 5000,
+    response_ends_trial: true,
+    choices: " ",
+    extensions: [{type: Naodao}],
+    data: {
+      plugin_name: "end"
+    }};
+
+var close_fullscreen = {
+        type: jsPsychFullscreen,
+        fullscreen_mode: false,
+        delay_after: 0
+    };
+
+/* ------  Step4: Customize the experiment ---- */
+
+// Date 
+var TODAY = new Date();
+var DD = String(TODAY.getDate()).padStart(2, '0');
+var MM = String(TODAY.getMonth() + 1).padStart(2, '0');
+const DATE = '-'+ MM + '-' + DD;
+
+// Subject id and filename 
+const SUB_id   = Math.round((1+Math.random()) * 1e9);
+const filename = "subj_" + SUB_id.toString() + DATE + ".csv";
+
+// Response time 
+const t_res    = 15000;
+const t_feed   = 1000;
+window.n_Prac = 1 
+const if_stoch = false; 
+window.pass_tut = 0;
+
+// materials
+// const block_info = {
+//     'prac1': {'n_learn_rep': 1}, //6
+//     'prac2': {'n_learn_rep': 1}, //10
+//     'block': {'n_learn_rep': 1, 'n_gen_rep': 1}, //10, 5
+//     'interleave':  {'n_learn_rep': 1, 'n_gen_rep': 1}, //10, 5
+// };
+// const prac_acc_bar = 0; //50;
+const block_info = {
+    'prac1': {'n_learn_rep': 6}, //6
+    'prac2': {'n_learn_rep': 10}, //10
+    'block': {'n_learn_rep': 12, 'n_gen_rep': 6}, //16, 5
+    'interleave':  {'n_learn_rep': 12, 'n_gen_rep': 6}, //16, 5
+};
+const prac_acc_bar = 70; //50;
+
+const voi = ['s', 'phase', 'a_cor', 'a_real', 'a_ava',
+            'trial', 'stage', 'tps', 'block_id', 
+            'block_type']
+
+const eps = randint(0, 2)
+const block_seq = shuffle(['block', 'interleave']) //, 
+
+const p2_mat = range(0, 4).map(x=>`materials/prac2/${x}.png`);
+const b0_mat = range(0, 8).map(x=>`materials/block0/${x}.png`);
+const b1_mat = range(0, 8).map(x=>`materials/block1/${x}.png`);
+const mat = p2_mat.concat(b0_mat).concat(b1_mat);
+
+
+/* ------ Step 7: construct the experiemnt ---- */
+
+var jsPsych = initJsPsych(
+    {   
+        extensions: [{type: Naodao}],
+        override_safe_mode: true,
+        on_finish: function() {
+            // sub_id 
+            var basic_info = jsPsych.data.get().filter({screen_id: 'basic_info'})['trials'][0]['response']
+            var sub_id     = basic_info['sub_id']
+            var sub_name   = basic_info['name']
+            var sub_birth  = basic_info['birth']
+            //jsPsych.data.addProperties({sub_id: sub_id})
+            // end time 
+            var now = new Date();
+            var end_time = now.toLocaleTimeString();
+            //jsPsych.data.addProperties({end_time: end_time})
+            
+            jsPsych.data.get().filter(
+            [{screen_id: 'sub_response'}]).ignore(
+                ['response', 'screen_id', 'trial_type', 'time_elapsed',
+                'internal_node_id', 'trial_index', 'stimulus']
+            ).localSave('csv', `Forgetting.csv`) // download from browser
+
+        jsPsych.data.get
+        document.getElementById('jspsych-content').innerHTML += `
+                    <div style='font-size: 35px'>
+                    <p>您已经完成了所有游戏。</p>
+                    <p>感谢参与。您已经可以关闭浏览器了。</p>
+                    </div>`
+        }
+    }
+);
+
+var main_timeline = [
+    preload_tut(), mk_wel_screen(),                   // welcome screen 
+    mk_preload(mat),
+    //basic_sc,                                         // name + birth
+    mk_tut(),                                         // tutorial block
+    mk_prac_block('prac2', 1),                        // practice block 
+    mk_main_block(block_seq[0], 0),                   // main block 2
+    mkTimer(), 
+    mk_main_block(block_seq[1], 1), 
+    end,
+    close_fullscreen,
+];
+
+var main = {
+    timeline: main_timeline,
+};
+
+/* ------ Step 7: Execute the experiemnt ---- */
+
+jsPsych.run(main_timeline);
+
+</script>
+</html>
